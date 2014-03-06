@@ -24,8 +24,6 @@
  *  must invoke the first parameter of the generator (the continueExecution
  *  function) when the call has completed.
  *
- * 3. The call continueExecution <b>must be asynchronous</b>.
- *
  * Ensures:
  *
  * 1. The generator is resumed after every asychronous yield has completed.
@@ -36,96 +34,8 @@
  * 3. If no error is passed to the continueExecution function, the yield
  *  expression evauluates to the data parameter.
  *
- * See exampleGenerator_countdown and exampleExecute_countdown
- *
  * ------------------------------ END CONTRACT ---------------------------------
  */
-
-/**
- *
- * An example of a generator that abides by the contract.
- */
-function* exampleGenerator_countdown(continueExecution, startFrom, callback)
-{
-   function printAsync(message, callback)
-   {
-      setTimeout(function()
-      {
-         console.log(message)
-         callback();
-      }, 0);
-   }
-
-   // call printAsync. When printAsync has finished it will call
-   //  continueExecution which resumes the generator.
-   yield printAsync(this.startText, continueExecution);
-
-   try
-   {
-      while(true)
-      {
-         var toPrint = yield setTimeout(function()
-         {
-            if (startFrom < 0)
-            {
-               continueExecution(new Error("startFrom is negative!"));
-            }
-            else
-            {
-               continueExecution(null, (startFrom--) + "...");
-            }
-         }, 1000);
-
-         console.log(toPrint);
-      }
-   }
-   catch (err)
-   {
-      console.log(this.endText);
-      callback();
-   }
-
-
-   
-}
-
-/**
- * An example of executing a generator that abides by the contract.
- */
-function exampleExecute_countdown()
-{
-   // var execute = require('ContinuousGenerator').execute;
-
-   function finishedCountdown()
-   {
-      console.log("countdown has finished.. do something..");
-   }
-
-   var theThisObject = {
-      startText: "Countdown started.",
-      endText: "BOOM!"
-   };
-
-   execute(exampleGenerator_countdown, [10, finishedCountdown], theThisObject);
-   /* stdout:
-    *
-    * Countdown started.
-    * 10...
-    * 9...
-    * 8...
-    * 7...
-    * 6...
-    * 5...
-    * 4...
-    * 3...
-    * 2...
-    * 1...
-    * 0...
-    * BOOM!
-    * countdown has finished.. do something..
-    */
-}
-
 
 module.exports = {
    execute : execute
@@ -141,30 +51,71 @@ module.exports = {
  */
 function execute(generator, args, thisObj)
 {
+   // TODO There should be a better way to do this.
+   // The instance needs a reference to the continueExecution function which
+   // needs a references to the instance.
    var instance = {};
-   var cont = continueExecution.bind(instance);
 
-   instance.instance = generator.apply(thisObj, [cont].concat(args));
+   var contExecution = continueExecution.bind(instance);
 
-   cont();
+   instance.instance = generator.apply(thisObj,
+      args === undefined ? [contExecution] : [contExecution].concat(args)
+   );
+
+   contExecution();
 }
 
 /**
- * Next is bound to a generator object and is used to return from yields.
+ * continueExecution is used to continue executing a generator after it has
+ *  yielded.
+ *
+ * If err is truthy, the error is thrown into the generator resulting in an
+ *  error raised at the yield statement.
+ *
+ * Else, data becomes the value of the yield expression that this call of
+ *  continueExecution resumes from.
+ *
+ * @param this the generator instance to continue executing
+ * @param err (optional) an error, if one occured
+ * @param data (optional) data to return to the generator
  */
 function continueExecution(err, data)
 {
-   if (err)
-   {
-      this.instance.throw(err);
-   }
-   else
-   {
-      this.instance.next(data);
-   }
-}
+   var instance = this.instance;
 
-if (require.main === module)
-{
-   exampleExecute_countdown();
+   //
+   // TODO allow the user to specify a "strict" setting or something to avoid
+   // this setTimeout stuff. They don't get the added protection, but they get
+   // to increase performance a bit.
+   //
+   // This will prevent a lot of unneeded frustration. Some functions that
+   //  are supposed to be asychronous call their callbacks synchronously in
+   //  certain circumstances (eg invalid input). Generators throw an error
+   //  if next or throw is called while they are still running.
+   // 
+   // setTimeout ensures that next() and throw() are called asynchronously.
+   //  It is a minor performance hit, but if the caller needs
+   //  superb performance they probably shouldn't be using generators anyway.
+   //
+   setTimeout(realContinueExecute, 0);
+
+   //
+   // I spent some time thinking about this... A closure really does need to be
+   // created on each and every call of continueExecution because
+   // of setTimeout. Still, I think the benefits of not having an runtime error
+   // that only bites you in the ass in rare circumstances outweighs
+   // the overhead introduced by creating a closure and delaying with setTimeout
+   // every time this function is called.
+   //
+   function realContinueExecute()
+   {
+      if (err)
+      {
+         instance.throw(err);
+      }
+      else
+      {
+         instance.next(data);
+      }
+   }
 }
