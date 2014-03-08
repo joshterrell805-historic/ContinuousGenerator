@@ -1,54 +1,8 @@
-/**
- * ContinuousGenerator is a module which executes a generator abiding by the
- *  generator contract continuously. Continuously means the
- *  generator will execute top to bottom resuming after each yielded asychronous
- *  function call is made.
- * 
- * Problem: "Callback Hell" is hell. Generators can solve callback hell in
- *  a lovely way, but they need to be resumed each time they are yielded.
- *  Boilerplate code is needed to continusouly resume generators.
- *
- * Solution: ContinuousGenerator provides the boilerplate code for generators
- *  to be resumed after asynchronous function calls have completed.
- */
-
-/**
- * -------------------------------- CONTRACT -----------------------------------
- *
- * Requires:
- * 
- * 1. The generator (param to execute) must be a nodejs generator.
- *
- * 2. Each time the generator wishes to resume after an asychronous call has
- *  completed it uses the yield statement. The callback of the asynchronous call
- *  must invoke the first parameter of the generator (the continueExecution
- *  function) when the call has completed.
- *
- * Ensures:
- *
- * 1. The generator is resumed after every asychronous yield has completed.
- *
- * 2. If an error is passed to the continueExecution function, that error
- *  is thrown into the generator function at the yield statement.
- *
- * 3. If no error is passed to the continueExecution function, the yield
- *  expression evauluates to the data parameter.
- *
- * ------------------------------ END CONTRACT ---------------------------------
- */
-
-module.exports = {
+module.exports =
+{
    execute : execute
 };
 
-/**
- * Create an instance of a generator and execute it continuously through all
- *  yields.
- *
- * @param generator the generator to be continuously executed.
- * @param args (optional) an array of arguments to pass to the generator
- * @param thisObj (option) the object to bind to "this" inside the generator
- */
 function execute(generator, args, thisObj)
 {
    // TODO There should be a better way to do this.
@@ -65,20 +19,6 @@ function execute(generator, args, thisObj)
    contExecution();
 }
 
-/**
- * continueExecution is used to continue executing a generator after it has
- *  yielded.
- *
- * If err is truthy, the error is thrown into the generator resulting in an
- *  error raised at the yield statement.
- *
- * Else, data becomes the value of the yield expression that this call of
- *  continueExecution resumes from.
- *
- * @param this the generator instance to continue executing
- * @param err (optional) an error, if one occured
- * @param data (optional) data to return to the generator
- */
 function continueExecution(err, data)
 {
    var instance = this.instance;
