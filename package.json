@@ -1,3 +1,10 @@
 {
+   "name": "ContinuousGenerator",
    "main": "./ContinuousGenerator.njs",
+   "version": "0.0.0-0",
+   "repository": "josterrell805/ContinuousGenerator",
+   "dependencies": {
+      "underscore": "~1.7.0",
+      "promise": "~5.0.0"
+   }
 }

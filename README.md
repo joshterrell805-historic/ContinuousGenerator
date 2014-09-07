@@ -1,192 +1,240 @@
-Avoid callback hell by employing generators.
+Avoid callback hell by employing continuously invoked generators.
 ====
 
 Skip directly to the [API](#api).
 
 ## Introduction
 
-They don't call it callback *hell* for nothing. There are several ways to avoid callback hell; here is my favorite.
-
 ContinuousGenerator involves employing generators from EcmaScript6. Generators are currently working in v0.11 of nodejs (unstable). From this point forward I'll assume you're semi-familiar with generators.
 
-Callback hell arises in javascript when an algorithm involves several asychronous calls which must happen sequentially.
+You probably know what callback hell is, and hopefully you're familiar with promises. ContinuousGenerator allows you to write asynchronous functions that pause to execute asynchronous calls, then resume after the asynchronous calls have completed. ContinousousGenerator also works well with promises. 
 
-Example -- A typical approach in implementing an algorithm involving two asynchronous steps
-```javascript
-function algorithm()
-{
-    var data;
-    
-    // some sync steps ...
-  
-   asyncStepOne(data, function(err, resultOne)
-    {
-      if (err)
-        {
-         // handle error ...
-        }
-            
-        // some sync steps ...
-        
-        
-        asyncStepTwo(resultOne, function(err, resultTwo)
-        {
-         if (err)
-            {
-               // handle error ...
-            }
-            
-            // some sync steps ...
-            
-            updateDisplay(resultTwo);
-        });
-    });
-}
+### Introductory Example
 
-function updateDisplay(results)
-{
-   // do some updating with the results
-}
+##### Using ContinuousGenerator to implement a function with several asynchronous calls
 
-algorithm();
-```
-
-Wow! That's only two function calls. Lets clean this up with a generator and the ContinuousGenerator module.
-
-Example -- Using generators and the ContinuousGenerator module to implement the same algorithm
 ```javascript
 var execute = require('ContinuousGenerator').execute;
 
-function* algorithm(continueExecution)
-{
-    var data;
-    
-    // some sync steps ...
-  
-    try
-    {
-       var resultOne = yield asyncStepOne(data, continueExecution);
-    }
-    catch (err)
-    {
-      // handle error ...
-    }
-    
-    // some sync steps ...
-    
-    try
-    {
-        var resultTwo = yield asyncStepTwo(resultOne, continueExecution); 
-    }
-    catch (err)
-    {
-      // handle error ...
-    }
-    
-   // some sync steps ...
-            
-    updateDisplay(resultTwo);
+// This example isn't complete for sake of brevity..
+// Imagine for a moment that we've already set up
+// an Http node server and eventually ended up creating an instance of
+// this class, UserResonder, passing in the `request` and `response`.
+// Then we called responder.respond() to actually respond to the request.
+function UserResponder(nodeReq, nodeRes) {
+   this.req = nodeReq;
+   this.res = nodeRes;
 }
 
-function updateDisplay(results)
-{
-   // do some updating with the results
-}
+UserResponder.prototype.respond = function respond() {
+   // some logic to determine whether request is login or register ...
+   register();
+};
 
-execute(algorithm);
+UserResponder.prototype.login = function login() {/* ... */};
+
+function getPostDataPromise() {/* ... */};
+
+UserResponder.prototype.register = function register() {
+   // here we use ContinuousGenerator.execute to continuously execute the
+   // generator.
+   // The generator is the first argument, the 'this' argument is the second
+   // argument to execute, and the arguemnts you want the generator to
+   // be passed are all the other arguments.
+   var returnValueP = execute(registerNewUser, this, this.req, this.res);
+
+   // returnValueP is a promise that resolves to the return value of the
+   // generator's execution. It is only resolved once the generator has
+   // successfully completed executing.
+
+   // You can also configure ContinuousGenerator to take a standard callback
+   // instead.
+};
+
+/**
+ * You can configure ContinuousGenerator to call your own `unhandledError`
+ * function when an error occurs in your generator that was not caught.
+ *
+ * You can also configure ContinuousGenerator to reject the returnValuePromise,
+ * call a global `unhandledError` function, or invoke a standard callback
+ * (passed to execute) with the error.
+ */
+UserResponder.prototype.onUnhandledError = function onUnhandledError(e) {
+   this.res.writeHead('500');
+   this.res.end('500: Unexpected Server Error');
+};
+
+/**
+ * Called on ajax POST request to register a new user.
+ *
+ * This is a generator function. If you don't know what generators are or
+ *  aren't familiar enough to use them, you might want to read up on them
+ *  first lest this won't make much sense. You should be familiar with
+ *  `yield` `throw` and `next` (with respect to generators).
+ */
+function* registerNewUser(cont, req, res) {
+   // validate that the request is fair game
+   
+   var postDataPromise = this.getPostDataPromise();
+
+   // cont.p is a function that takes a promise and resumes the continuous
+   // generator when the promise has resolved.
+   // If the promise was resolved, cont.p will yield the resolved value
+   // into the generator--resuming execution.
+   // If the promise was rejected, cont.p will throw the rejected value
+   // into the generator--resuming execution.
+
+   var postData = yield cont.p(postDataPromise.then(JSON.parse));
+
+   try {
+      var user = yield UserLib.createUser({
+         username: postData.username,
+         passwordHash: postData.passwordHash,
+         email: postData.email,
+      }, cont);
+
+      // cont is a standard node callback function in the form (err, val).
+      // cont will resume execution of your generator when it is called.
+      // it is safe to call from synchronous functions due to a process.nextTick
+      //  sync-guard
+      // as expected, if err is defined, cont throws `err` into the
+      // generator when it resumes execution.
+      // otherwise cont resumes execution by yielding `val`.
+
+      var sessionId = yield UserLib.login(user, cont);
+      var response = {
+         'success': true,
+         'sessionId': sessionId,
+      };
+   } catch (e) {
+      var response = {
+         'success': false,
+      };
+      switch (e.code) {
+      case 'USERNAME_INVALID':
+      case 'USERNAME_TAKEN':
+      case 'EMAIL_INVALID':
+      case 'EMAIL_TAKEN':
+         response.reason = e.code;
+         break;
+      default:
+         response.reason = '500';
+         res.writeHead('500');
+      }
+   }
+
+   res.end(response);
+
+   // when the function returns, since we didn't
+   // specify another cont function to be executed, the generator will
+   // finaly stop being invoked.
+   return response.success;
+}
 ```
-The code is much neater, objectively speaking. By using a generator the second example is able to return to executing *algorithm* 
-after an asychronous call has completed. [continueExecution](#continueexecution) is the callback that continues the *algorithm* after *asycStepOne* has completed.
 
-Sold? Here's the docs.
-
-## <a name="api"></a> API
-Warning: I just learned about design by contract and I'm a fan. I do no error checking, so make sure you use the API correctly.
+## API
 
 Table of contents:
 
 * [ContinuousGenerator](#continuousgenerator) (module)
-* [execute](#execute)
-* [continueExecution](#continueExecution)
-* [Generator Contract](#generator-contract)
+* [ContinuousGenerator.execute](#continuousgenerator-execute)
+* [ContinuousGenerator.configure](#continuousgenerator-configure)
+* [ContinuousGenerator.Executor](#continuousgenerator-executor)
+* [cont](#cont)
 
 ---
 
-### <a name="continuousgenerator"></a> ContinuousGenerator
+### ContinuousGenerator
 
 ```javascript
-module.exports =
-{
-   execute : execute
+module.exports = {
+   execute,
+   configure,
+   Executor,
 }
 ```
-
-The module itself. ContinuousGenerator (for now) contains one exposed method: [execute](#execute)
+- [execute](#continuousgenerator-execute) is the item of most interest. `execute` is how you actually execute a generator.
+- [configure](#continuousgenerator-configure) is how you configure `ContinuousGenerator` to better suit your needs and coding style.
+- [executor](#continuousgenerator-executor) is how generators actually get continually executed. It contains the logic necissary to provide different return types and error handling as well as some other stuff.
 
 [Go up to API contents](#api)
 
 ---
 
-### execute
+### ContinuousGenerator.execute
 
 ```javascript
-function execute(generator, arguments, thisObject) {...}
+function execute(generator, context, callback, arg1, arg2, arg3, etc)
 ```
 
-Create an instance of `generator`, and continuously execute it through all asychronous yields.
+Create an instance of `generator`, and continuously execute it through all synchronous and asynchronous yields.
 
 Parameters:
 
-* **generator** - a reference to a generator function. Must abide by the [Generator Contract](#generator-contract).
-* **arguments** (optional) - an array of arguments to be passed to the generator upon instantiation
-* **thisObject** (optional) - an object to bind to `this` on the generator instance
+- **generator** - a reference to a generator function you wish to execute until completion.
+- **context** - a reference to an object that will be the context of the running generator (bound as `this` in your generator function).
+- **callback** (optional) - a callback to be called when your generator function has completed
+ or there is an uncaught error in the function.
+- **arguments** (optional) - all your arguments that you want to get passed to the generator should
+ go here. Note: by default the first parameter of the generator function is [cont](#cont). This means that your arguments actually start of with the second parameter to your generator (unless you disable the option).
 
 [Go up to API contents](#api)
 
 ---
 
-### <a name="continueexecution"></a> continueExecution
+### ContinuousGenerator.configure
 
 ```javascript
-function continueExecution(error, data) {...}
+function configure(options)
 ```
 
-Resume the generator from its last `yield`.
+Configure `ContinuousGenerator` to better suit your needs and style.
 
-Parameters:
+Some things you can do:
+- specify that `cont` should not be passed as the first param to your generator.
+   - `contFirstParam: false`
+- specify that `cont` should not be defined on `context` (this of your generator)
+   - `contDefinedOnThis: false`
+- specify the methods (and order) of how returnValues and exceptions that aren't caught in your generator are returned to you.
 
-* **error** (optional) - the error to be thrown into the generator
-* **data** (optional) - the data to be returned into the generator
-
-If error is truthy, the error is thrown into the generator at the yield statement. Otherwise data is returned into the generator at the yield statement.
-
-*Note: this function may be called synchronously.*
-
-*Some functions that claim to be asychronous call their callbacks sychronously in certain circumstances (e.g. error). If one tries to resume a generator while it is running (e.g. a yield with a sychronous call to `continueExecution`), an error would normally be thrown. To protect users from this annoying error, `continueExecution` always resumes the generator asychronously which introduces slight performance hit. A version of `continueExecution` that must be called asychrnously may be included in the future to avoid this performance hit.*
+The options are pretty well documented in [ContinuousGenerator.njs](ContinuousGenerator.njs).
 
 [Go up to API contents](#api)
 
 ---
 
-### <a name="generator-contract"></a> Generator Contract
+### ContinuousGenerator.Executor
 
-This contract states how generators must be designed in order to be executed sucessfully by this module.
-
-Signatures don't matter in javascript--we have the `arguments` array. However, an informational function signature is desplayed below to infer what this module expects of the generators you pass to it.
 ```javascript
-function* functionName(continueExecution, argument1, argument2, argument3, ....) {...}
+function Executor(generator, context, callback, options, args)
 ```
 
-Arguments:
+An internal helper class which executes genrators. The code isn't so bad, check it out.
 
-The first argument passed to your generator is the [continueExecution](#continueexecution) method. This method has a reference to your generator instance. You must use this method to resume execution after yielding. The remaining arguments are the elements of the `arguments` array of [execute](#execute). Element1 of the `arguments` array corresponds to argument1, etc.
+[Go up to API contents](#api)
 
-Asychronous calls:
+---
 
-If the algorithm doesn't need to wait until an asychronous has completed, it should just call the asychronous call without yielding. Using `yield` and [continueExecution](#continueexecution) should only be done when the algorithm needs an asychronous call to finish executing before continuing. [continueExectuion](#continueexecution) should be invoked exactly once per yield in the generator.
+### cont
 
-*Tip: if the algorithm doesn't care about the order in which two or more asychronous calls are executed, it should execute all of the asychronous calls and yield once. [continueExecution](#continueexecution) should be called after all calls have completed.*
+```javascript
+function continueFromCallback(err, val)
+function continueFromPromise(promise)
+```
 
-Examples of correctly implemented generators and [execute](#execute) invocations for those generators are supplied in the [examples directory](https://github.com/joshterrell805/ContinuousGenerator/tree/master/examples).
+Resume the generator.
+
+`cont` should be called exactly once for every `yield` in your generator. You can continue by calling the callback or by passing a promise to `cont.p`, which when it is resolved or is rejected, will resume your generator.
+
+Both `cont` and `cont.p` will resume your generator by returning a value into it or throwing a value into it (at the yield).
+
+The value `cont` or `cont.p` returns or throws depends on what you pass to the callback or what your promise resolves/rejects to.
+
+##### Aliases
+
+```javascript
+cont.callback = cont.c = cont;
+cont.promise = cont.p;
+```
 
 [Go up to API contents](#api)
