@@ -137,9 +137,9 @@ function* registerNewUser(cont, req, res) {
 Table of contents:
 
 * [ContinuousGenerator](#continuousgenerator) (module)
-* [ContinuousGenerator.execute](#continuousgenerator-execute)
-* [ContinuousGenerator.configure](#continuousgenerator-configure)
-* [ContinuousGenerator.Executor](#continuousgenerator-executor)
+* [ContinuousGenerator.execute](#continuousgeneratorexecute)
+* [ContinuousGenerator.configure](#continuousgeneratorconfigure)
+* [ContinuousGenerator.Executor](#continuousgeneratorexecutor)
 * [cont](#cont)
 
 ---
@@ -153,9 +153,9 @@ module.exports = {
    Executor,
 }
 ```
-- [execute](#continuousgenerator-execute) is the item of most interest. `execute` is how you actually execute a generator.
-- [configure](#continuousgenerator-configure) is how you configure `ContinuousGenerator` to better suit your needs and coding style.
-- [executor](#continuousgenerator-executor) is how generators actually get continually executed. It contains the logic necissary to provide different return types and error handling as well as some other stuff.
+- [execute](#continuousgeneratorexecute) is the item of most interest. `execute` is how you actually execute a generator.
+- [configure](#continuousgeneratorconfigure) is how you configure `ContinuousGenerator` to better suit your needs and coding style.
+- [executor](#continuousgeneratorexecutor) is how generators actually get continually executed. It contains the logic necissary to provide different return types and error handling as well as some other stuff.
 
 [Go up to API contents](#api)
 
@@ -209,7 +209,7 @@ The options are pretty well documented in [ContinuousGenerator.njs](ContinuousGe
 function Executor(generator, context, callback, options, args)
 ```
 
-An internal helper class which executes genrators. The code isn't so bad, check it out.
+An internal helper class which executes genrators. The [code](Executor.njs) isn't so bad, check it out.
 
 [Go up to API contents](#api)
 
