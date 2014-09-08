@@ -15,9 +15,9 @@ function Executor(generator, context, callback, options, args) {
    this.options = _.pick(options, rememberedOptions);
    this.args = args;
 
-   var cont = this.continueFromCallback.bind(context);
+   var cont = this.continueFromCallback.bind(this);
    cont.callback = cont.c = cont;
-   cont.promise = cont.p = this.continueFromPromise.bind(context);
+   cont.promise = cont.p = this.continueFromPromise.bind(this);
    this.cont = cont;
 
    if (options.contFirstParam) {
@@ -83,7 +83,7 @@ Executor.prototype.continueFromCallback =
                this.options.onUnhandledError(e);
                break;
             case 'thisOnError':
-               var context = this.generatorContext;
+               var context = this.context;
                var handler = context[this.options.thisOnUnhandledErrorName]
                handler.call(context, e);
                break;
@@ -111,10 +111,10 @@ Executor.prototype.continueFromPromise = function continueFromPromise(promise) {
  * in `options`.
  */
 function define(options, name, value) {
-   Object.defineProperty(_this, name + 'Name', {
+   Object.defineProperty(this, name + 'Name', {
       value: value,
       enumerable: options[name + 'Enumerable'],
       configurable: options[name + 'Configurable'],
-      writable: options[name + 'Writable',
+      writable: options[name + 'Writable'],
    });
 }

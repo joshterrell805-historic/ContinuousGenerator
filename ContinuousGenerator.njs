@@ -53,11 +53,11 @@ function configure(opts) {
 }
 
 function execute(generator, context, callback, arg1, arg2, arg3, etc) {
-   if (_this === null) {
+   if (context === null) {
       // Who does function.call(undefined, arg1, ...)?
       // Don't catch undefined in case it was an accident
       // (allow error to be thrown).. null is likely not an accident.
-      _this = {};
+      context = {};
    }
 
    var Executor = options.Executor;
