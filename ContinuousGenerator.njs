@@ -66,3 +66,7 @@ function execute(generator, context, callback, arg1, arg2, arg3, etc) {
 
    return executor.execute();
 }
+
+function onUnhandledError(err) {
+   throw e;
+}
