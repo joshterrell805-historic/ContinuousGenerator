@@ -60,9 +60,11 @@ function execute(generator, context, callback, arg1, arg2, arg3, etc) {
       context = {};
    }
 
+   var args = Array.prototype.slice.call(arguments, 3);
+
    var Executor = options.Executor;
    var executor = new Executor(generator, context, callback,
-    options, Array.prototype.slice(arguments, 3));
+    options, args);
 
    return executor.execute();
 }
