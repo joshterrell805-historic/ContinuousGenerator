@@ -49,6 +49,7 @@ var defaultOptions = {
 var options = defaultOptions;
 
 function configure(opts) {
+   var _ = require('underscore');
    options = _.defaults({}, opts, defaultOptions);
 }
 
