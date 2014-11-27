@@ -29,10 +29,9 @@ function Executor(generator, context, callback, options, args) {
 
    define.call(context, options, 'executorInstance', this);
 
-   // Promise.resolve() so resolve/reject added to this now.
-   this.returnPromise = Promise.resolve().then(function (resolve, reject) {
-      this.promiseReject = reject;
-      this.promiseResolve = resolve;
+   this.returnPromise = new Promise(function (resolve, reject) {
+     this.promiseResolve = resolve;
+     this.promiseReject = reject;
    }.bind(this));
 }
 
