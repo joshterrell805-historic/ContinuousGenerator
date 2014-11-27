@@ -57,7 +57,6 @@ Executor.prototype.continueFromCallback =
                console.log(method);
                switch (method) {
                case 'promise':
-                  console.log('d promise');
                   this.promiseResolve(retval.value);
                   break;
                case 'callback':
@@ -71,12 +70,10 @@ Executor.prototype.continueFromCallback =
             }
          }
       } catch (e) {
-         console.log('err');
          for (var i = 0; i < this.options.unhandledErrorMethods.length; ++i) {
             var method = this.options.unhandledErrorMethods[i];
             switch(method) {
             case 'promise':
-                  console.log('e promise');
                this.promiseReject(e);
                break;
             case 'callback':
