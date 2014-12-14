@@ -1,75 +1,44 @@
-module.exports = {
-   execute: execute,
-   configure: configure,
-};
+module.exports = execute;
+var Promise = require('promise');
 
-var defaultOptions = {
-   // There are two options for receiving the continue method (so far):
-   // pass the continue function as the first argument to the generator
-   // and/or store continue on the `this` object.
-   contFirstParam: true,
-   contDefinedOnThis: true,
+/**
+ * Execute a generator continuously.
+ *
+ * The generator yields promises, the results of which are yielded or thrown
+ * back into the generator.
+ *
+ * @resolve the return value of the generator
+ * @reject an unhandled error thrown inside the generator
+ */
+function execute(Generator, context, arg1, arg2, arg3, etc) {
+  var args = Array.prototype.slice.call(arguments, 2);
+  var generatorInstance = Generator.apply(context, args);
 
-   // The return value returned from your generator will returned by...
-   // choose one or many.
-   // promise | callback
-   returnMethods: ['promise', 'callback'], // order matters
+  return new Promise(function(resolve, reject) {
+    cont({done: false, value: Promise.resolve()});
 
-   // if you chose 'contDefinedOnThis' == true, this is the field of `this` that
-   // cont will be defined in.
-   contName: 'cont',
-   contEnumerable: true,
-   contConfigurable: true,
-   contWritable: true,
+    function cont(retval) {
+      if (retval.done === true) {
+        return resolve(retval.value);
+      }
 
-   // unhandled error returned to caller by:
-   // choose one or many.
-   // promise | callback | configOnError | thisOnError
-   unhandledErrorMethods: ['promise', 'callback'], // order matters
-
-   // if unhandledErrorMethod == 'configOnError', call this function when
-   // an error occurs.
-   onUnhandledError: onUnhandledError,
-
-   // if unhandledErrorMethod == 'thisOnError', call `_this.onUnhandledError`
-   // (or whatever you set this option to) when there is an un caught
-   // error thrown from within the generator.
-   // You need to define this
-   thisOnUnhandledErrorName: 'onUnhandledError',
-
-   // We need to store the executor instance in a variable on this.
-   executorInstanceName: '_ContinuousGenerator_executorInstance',
-   executorInstanceEnumerable: false,
-   executorInstanceConfigurable: false,
-   executorInstanceWritable: false,
-
-   Executor: require('./Executor.njs'),
-};
-
-var options = defaultOptions;
-
-function configure(opts) {
-   var _ = require('underscore');
-   options = _.defaults({}, opts, defaultOptions);
-}
-
-function execute(generator, context, callback, arg1, arg2, arg3, etc) {
-   if (context === null) {
-      // Who does function.call(undefined, arg1, ...)?
-      // Don't catch undefined in case it was an accident
-      // (allow error to be thrown).. null is likely not an accident.
-      context = {};
-   }
-
-   var args = Array.prototype.slice.call(arguments, 3);
-
-   var Executor = options.Executor;
-   var executor = new Executor(generator, context, callback,
-    options, args);
-
-   return executor.execute();
-}
-
-function onUnhandledError(err) {
-   throw e;
+      // else, generator not finished
+      var yieldedPromise = retval.value;
+      yieldedPromise.done(function(val) {
+        try {
+          var ret = generatorInstance.next(val);
+        } catch (e) {
+          return reject(e);
+        }
+        cont(ret);
+      }, function(err) {
+        try {
+          var ret = generatorInstance.throw(err);
+        } catch (e) {
+          return reject(e);
+        }
+        cont(ret);
+      });
+    }
+  });
 }
