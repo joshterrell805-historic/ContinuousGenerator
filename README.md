@@ -10,7 +10,7 @@ asynchronous code has executed.
 mocha --harmony test.mocha.njs
 
 ### Examples
-Also, see examples.
+Also, see tests.
 
 ```js
 function* Generator(x) {
