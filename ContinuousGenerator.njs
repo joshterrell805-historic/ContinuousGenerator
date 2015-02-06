@@ -12,6 +12,11 @@ var Promise = require('promise');
  */
 function execute(Generator, context, arg1, arg2, arg3, etc) {
   var args = Array.prototype.slice.call(arguments, 2);
+  return execute.apply(Generator, context, args);
+}
+
+execute.call = execute;
+execute.apply = function apply(Generator, context, args) {
   var generatorInstance = Generator.apply(context, args);
 
   return new Promise(function(resolve, reject) {
@@ -41,4 +46,14 @@ function execute(Generator, context, arg1, arg2, arg3, etc) {
       });
     }
   });
-}
+};
+
+/**
+ * Return a *function* that wraps a generator returning a promise for the
+ * generator's return value.
+ */
+execute.promise = function promise(Generator) {
+  return function() {
+    return execute.apply(Generator, this, arguments);
+  };
+};

@@ -3,7 +3,46 @@ var exec = require('./ContinuousGenerator.njs');
 var Promise = require('promise');
 
 describe('ContinuousGenerator', function() {
-  describe('#execute', function() {
+  describe('#apply', function() {
+    it('should pass array as arguments to generator', function(done) {
+      exec.apply(function*(a, b) {return {'a': a, 'b': b};}, null, [4,8])
+      .done(function(val) {
+        assert.strictEqual(val.a, 4);
+        assert.strictEqual(val.b, 8);
+        done();
+      });
+    });
+    it('should set `this` context', function(done) {
+      var dis = {asdf: 23};
+      exec.apply(function* () {return this;}, dis)
+      .done(function(val) {
+        assert.strictEqual(val, dis);
+        done();
+      });
+    });
+  });
+  describe('#promise', function() {
+    it('should pass args', function(done) {
+      var f = exec.promise(function*(a, b) {return{'a':a,'b':b};});
+      f(4, 8)
+      .done(function(val) {
+        assert.strictEqual(val.a, 4);
+        assert.strictEqual(val.b, 8);
+        done();
+      });
+    });
+    it('should set `this` context', function(done) {
+      var dis = {asdf: 23};
+      var f = exec.promise(function* () {return this;});
+      f.call(dis)
+      .done(function(val) {
+        assert.strictEqual(val, dis);
+        assert.strictEqual(val.asdf, dis.asdf);
+        done();
+      });
+    });
+  });
+  describe('#execute (call)', function() {
     it('should return appropriate value', function(done) {
       exec(function* () {return 'z';}, null)
       .done(function(val) {
