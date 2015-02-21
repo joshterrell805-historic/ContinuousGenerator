@@ -12,40 +12,75 @@ mocha --harmony test.mocha.njs
 ### Examples
 Also, see tests.
 
-```js
-function* Generator(x) {
-  console.log(this.y); // 0
-  // ContGen resumes the generator with the value that the yielded promise
-  // *resolves* to, or it throws the value that the yielded promise *rejects* to
-  // back into the generator.
-  this.y = yield asyncSquare(x);
-  return x + 3;
-}
+This example is some production code from a project I am working on.
+I thought it was a great example of how much more readable contgen makes my
+code.
 
-function asyncSquare(x) {
-  return new Promise(function(resolve, reject) {
-    setTimeout(function() {
-      resolve(x*x);
-    }, 1000);
+I originally wrote the promise version for testing, then refactored it to the
+contgen version for readability.
+```js
+var _ = require('underscore'),
+    Promise = require('Promise'),
+    fs = require('fs'),
+    contgen = require('ContinuousGenerator');
+
+var unlink = Promise.denodeify(fs.unlink);
+
+module.exports = {
+  promiseUploadImages: promiseUploadImages,
+  // or
+  promiseUploadImages: contgen.promise(uploadImagesGen),
+};
+
+// with promises and no generators
+function* promiseUploadImages(base64s) {
+  var images = [];
+  // successively upload each image
+  return _.reduce(base64s, function(memo, base64) {
+    return memo
+    .then(function() {
+      return promiseUploadImage_(base64)
+      .then(function(image) {
+        images.push(image);
+      });
+    });
+  }, Promise.resolve())
+  .then(function() {
+    // on success, return the array of hashes describing the images.
+    return images;
+  }, function(err) {
+    // on error, delete all successfully uploaded images
+    return Promise.all(_.map(images, function(image) {
+      return unlink(config.uploadImageDir + image.path);
+    }))
+    .then(function() {
+      throw err;
+    })
   });
 }
 
-var ContGen = require('ContinuousGenerator').execute,
-    dis = {y: 0};
 
-var resultP = ContGen(
-    Generator,  // the generator function
-    dis,        // "this" inside the generator
-    4           // argument (x)
-);
+// with generators
+function *uploadImagesGen(base64s) {
+  try {
+    var images = [];
 
-resultP.done(function(val) {
-  // the return value of invoking Generator with the arguments above
-  console.log(val); // 7
-  console.log(dis.y); // 16;
-},
-function(err) {
-  // any uncaught errors thrown into or thrown inside of the generator
-  // are received here
-});
+    for(var i = 0; i < base64s.length; ++i) {
+      var image = yield promiseUploadImage_(base64[i]);
+      images.push(image);
+    }
+
+    return images;
+  } catch (e) {
+    for (var i = 0; i < images.length; ++i) {
+      yield unlink(config.uploadImageDir + image[i].path);
+    }
+    throw e;
+  }
+}
+
+function promiseUploadImage_(base64) {
+  // upload the image and return a promise for its successful upload
+  // ...
+}
 ```
